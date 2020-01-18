@@ -53,8 +53,12 @@ class Application(tk.Frame):
         self.check_random = tk.Checkbutton(self.practice_menu_frame, text="ランダム", variable=self.is_random)
         self.check_random.pack(side="left")
 
-        self.button_start = tk.Button(self, text="start", command=self.start)
-        self.button_start.pack()
+        self.button_frame = tk.Frame(self)
+        self.button_frame.pack(fill="x")
+        self.button_start = tk.Button(self.button_frame, text="start", command=self.start)
+        self.button_start.pack(side="left")
+        self.button_stop = tk.Button(self.button_frame, text="stop", command=self.stop)
+        self.button_stop.pack(side="left")
 
         self.photo = tk.PhotoImage()
         self.canvas = tk.Canvas(bg="black", width=self.canvas_width, height=self.canvas_height)
@@ -127,6 +131,11 @@ class Application(tk.Frame):
                 self.is_random.set(csv[3])
 
                 self.file_paths = glob.glob(self.input_directory.get() + "/*.png")
+
+    def stop(self):
+        self.repeat_num = 0
+        self.photo = tk.PhotoImage()
+        self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
 
 
 root = tk.Tk()
