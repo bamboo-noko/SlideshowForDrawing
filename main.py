@@ -1,5 +1,6 @@
 import tkinter as tk
 import os
+from slideshowservice import SlideshowService
 import random
 import glob
 from tkinter import filedialog
@@ -8,23 +9,24 @@ import json
 import ast
 import re
 from PIL import Image, ImageTk, ImageOps
+import numpy as np
+import matplotlib.pyplot as plt
+from history import History
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg, NavigationToolbar2Tk)
 
-class History():
-    def __init__(self):
-        self.file_paths = []
-        self.repeat_num = 0
-        self.time_limit = 0
-        self.create_datetime = ""
 
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+        self.serivce = SlideshowService()
         self.master = master
         self.pack()
         self.repeat_num = 0
         self.indexes = []
         self.index = 0
-        self.history = []
+        self.history = History()
+        self.history_list = []
         self.create_menu()
         self.elapsed_time = 0
         self.tick = 1
@@ -110,6 +112,7 @@ class Application(tk.Frame):
         self.ready()
         image = self.get_next_image()
         self.display_image(image)
+        self.create_history()
         self.after(self.tick * 1000, self.timer_event)
 
     def is_ready(self):
@@ -170,7 +173,7 @@ class Application(tk.Frame):
             random.shuffle(self.indexes)
 
     def get_next_image(self):
-        self.index = 0 if self.index+1 == len(self.file_paths) else self.index + 1
+        self.index = self.serivce.get_next_image_index(self.index, len(self.file_paths))
         im = Image.open(self.file_paths[self.indexes[self.index]])
         return im
 
@@ -183,8 +186,9 @@ class Application(tk.Frame):
         self.string_var_time_limit.set(self.input_time_limit.get())
         self.repeat_num -= 1
         self.number_of_times_remaining["text"] = self.repeat_num
+        self.history.end_time = datetime.datetime.today()
+        self.history_list.append(self.history)
         if self.repeat_num <= 0:
-            self.save_history()
             self.end()
             return
 
@@ -207,6 +211,8 @@ class Application(tk.Frame):
         self.button_stop["state"] = "disabled"
         self.button_next["state"] = "disabled"
         self.button_pause["state"] = "disabled"
+        self.save_history()
+        self.history_list.clear()
 
     def open_image(self):
         select_directory_path = filedialog.askdirectory()
@@ -220,7 +226,11 @@ class Application(tk.Frame):
         self.canvas_width = event.width
 
     def create_history(self):
-        self.history.append(self.file_paths[self.indexes[self.index]])
+        self.history = History()
+        self.history.file_path = self.file_paths[self.indexes[self.index]]
+        self.history.time_limit = self.input_time_limit.get()
+        self.history.start_time = datetime.datetime.today()
+        self.history.create_datetime = datetime.datetime.today()
 
     def display_image(self, image):
         if self.is_mirror.get() and random.randrange(0, 2) == 1:
@@ -266,6 +276,9 @@ class Application(tk.Frame):
                 self.file_paths = glob.glob(self.input_directory.get() + "/*.png")
 
     def stop(self):
+        self.history.end_time = datetime.datetime.today()
+        self.history_list.append(self.history)
+
         self.end()
 
     def next(self):
@@ -288,56 +301,43 @@ class Application(tk.Frame):
             self.button_pause["text"] = "resume"
 
     def save_history(self):
-        datetime_format = "%Y%m%d_%H%M%S"
-        today = datetime.datetime.today()
+        save_filename = "history.csv"
+        filepath = "history/{}".format(save_filename)
 
-        history = History()
-        history.file_paths = self.history
-        history.repeat_num = self.input_repeat_num.get()
-        history.time_limit  = self.input_time_limit.get()
-        history.create_datetime = today.strftime(datetime_format)
+        csv_list = []
+        for history in self.history_list:
+            csv = []
+            csv.append(history.file_path.replace('\\','/'))
+            csv.append(history.time_limit)
+            csv.append(history.start_time.isoformat())
+            csv.append(history.end_time.isoformat())
+            diff_time = history.end_time - history.start_time
+            csv.append(str(diff_time))
+            csv.append(history.create_datetime.isoformat())
+            csv_list.append(",".join(csv))
 
-        to_json = str(vars(history)).replace('\'', '"')
-        with open("history/"+today.strftime(datetime_format)+".json", 'w', encoding="utf-8") as f:
-            json.dump(ast.literal_eval(to_json), f)
-
-        self.open_history()
-
-    def open_history(self):
-        today = datetime.date.today()
-        file_paths = glob.glob("history/{}{}{}*{}".format(today.year, today.strftime("%m"), today.strftime("%d"), ".json"))
-        historys = []
-        for file_path in file_paths:
-            with open(file_path, 'r', encoding="utf-8") as f:
-                json_file = json.load(f)
-                history = History()
-                history.repeat_num = json_file['repeat_num']
-                history.time_limit = json_file['time_limit']
-                history.file_paths = json_file['file_paths']
-                history.create_datetime = json_file['create_datetime']
-                historys.append(history)
-
-        sum_repeat_num = 0
-        for h in historys:
-            sum_repeat_num += int(h.repeat_num)
+        if os.path.exists(filepath):
+            with open("history/"+save_filename, 'a', encoding="utf-8") as f:
+                f.write('\n')
+                f.write("\n".join(csv_list))
+        else:
+            with open("history/"+save_filename, 'a', encoding="utf-8") as f:
+                f.write("\n".join(csv_list))
 
     def report(self):
-        today = datetime.date.today()
-        file_paths = glob.glob("history/{}{}{}*{}".format(today.year, today.strftime("%m"), today.strftime("%d"), ".json"))
-        historys = []
-        for file_path in file_paths:
-            with open(file_path, 'r', encoding="utf-8") as f:
-                json_file = json.load(f)
-                history = History()
-                history.repeat_num = json_file['repeat_num']
-                history.time_limit = json_file['time_limit']
-                history.file_paths = json_file['file_paths']
-                history.create_datetime = json_file['create_datetime']
-                historys.append(history)
+        self.dialog = tk.Toplevel()
+        self.dialog.title("modal dialog")
+        self.dialog.geometry("300x300")
+        self.dialog.grab_set()
 
-        sum_repeat_num = 0
-        for h in historys:
-            sum_repeat_num += int(h.repeat_num)
+        service = SlideshowService()
+        history_list = service.get_history_all("history.csv")
+        history_dict = service.get_report(history_list)
+        fig = service.create_graph(history_dict)
+        canvas = FigureCanvasTkAgg(fig, self.dialog)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
 
 root = tk.Tk()
 root.state('zoomed')
