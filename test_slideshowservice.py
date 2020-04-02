@@ -77,6 +77,15 @@ class TestSlideshowService(unittest.TestCase):
         self.assertEqual(len(history_dict[11]), 1)
         self.assertEqual(len(history_dict[23]), 2)
 
+    def test_fit_the_size(self):
+        service = SlideshowService()
+        result = service.fit_the_size(100, 20)
+        expected = 1
+        self.assertEqual(result, expected)
+
+        result = service.fit_the_size(20, 100)
+        expected = 0.2
+        self.assertEqual(result, expected)
 
 
 

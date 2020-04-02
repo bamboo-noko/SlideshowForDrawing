@@ -216,10 +216,10 @@ class Application(tk.Frame):
 
     def open_image(self):
         select_directory_path = filedialog.askdirectory()
-        self.file_paths = [p for p in glob.glob(select_directory_path + "/*.*")
-            if re.search('.*\.(png|jpg)', str(p))]
+        self.file_paths = [p for p in glob.glob(select_directory_path + "/*.*") if re.search('.*\.(png|jpg)', str(p))]
         self.input_directory.delete(0, tk.END)
         self.input_directory.insert(tk.END, select_directory_path)
+        print(self.file_paths)
 
     def resize(self, event):
         self.canvas_height = event.height
@@ -235,9 +235,11 @@ class Application(tk.Frame):
     def display_image(self, image):
         if self.is_mirror.get() and random.randrange(0, 2) == 1:
             image = ImageOps.mirror(image)
-        image_tk = ImageTk.PhotoImage(image)
+
+        diff_h = self.serivce.fit_the_size(self.canvas_height, image.height)
+        resize_image = image.resize((int(image.width * diff_h), int(image.height * diff_h)), Image.ANTIALIAS)
+        image_tk = ImageTk.PhotoImage(resize_image)
         self.photo = image_tk
-        
         self.canvas.create_image(self.master.winfo_width()/2, self.canvas.winfo_height()/2, image=image_tk, anchor=tk.CENTER)
 
     def save_config(self):
@@ -273,7 +275,8 @@ class Application(tk.Frame):
                 self.is_random.set(csv[3])
                 self.is_mirror.set(csv[4])
 
-                self.file_paths = glob.glob(self.input_directory.get() + "/*.png")
+                # self.file_paths = glob.glob(self.input_directory.get() + "/*.png")
+                self.file_paths = [p for p in glob.glob(self.input_directory.get() + "/*.*") if re.search('.*\.(png|jpg)', str(p))]
 
     def stop(self):
         self.history.end_time = datetime.datetime.today()
@@ -330,10 +333,9 @@ class Application(tk.Frame):
         self.dialog.geometry("300x300")
         self.dialog.grab_set()
 
-        service = SlideshowService()
-        history_list = service.get_history_all("history.csv")
-        history_dict = service.get_report(history_list)
-        fig = service.create_graph(history_dict)
+        history_list = self.service.get_history_all("history.csv")
+        history_dict = self.service.get_report(history_list)
+        fig = self.service.create_graph(history_dict)
         canvas = FigureCanvasTkAgg(fig, self.dialog)
         canvas.draw()
         canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)

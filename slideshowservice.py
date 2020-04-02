@@ -11,6 +11,13 @@ class SlideshowService:
     def get_next_image_index(self, current_index, file_num):
         return 0 if current_index+1 >= file_num else current_index + 1
 
+    def fit_the_size(self, canvas_height, image_height):
+        diff_h = 1
+        if canvas_height < image_height:
+            diff_h = canvas_height / image_height
+
+        return diff_h
+
     def get_history_all(self, history_file_name):
         save_filename = history_file_name
         history_file_path = "history/{}".format(save_filename)
